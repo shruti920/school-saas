@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { loginSchema } from "../schemas/loginSchema";
 import useLogin from "../hooks/useLogin";
+import  useAuth  from "../hooks/useAuth";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +16,9 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginForm() {
   const router = useRouter();
-
-  const { loading, handleLogin } = useLogin();
-
+  const { loading: loginLoading, handleLogin } = useLogin();
+  const { user, profile, loading: authLoading } = useAuth();
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const [error, setError] = useState("");
 
   const {
@@ -30,6 +31,7 @@ export default function LoginForm() {
 
   async function onSubmit(values) {
     setError("");
+    setLoginSuccess(false);
 
     const result = await handleLogin(values);
 
@@ -38,7 +40,34 @@ export default function LoginForm() {
       return;
     }
 
-    router.push("/dashboard");
+    // Login succeeded, wait for auth state to update
+    setLoginSuccess(true);
+  }
+
+  // Redirect based on role after login
+  // We use useEffect to wait for the auth context to update with user and profile
+  // and loginSuccess flag to be true.
+  // Note: authLoading might be true while waiting for session to load.
+  if (loginSuccess && user && profile && !authLoading) {
+    // Redirect based on role
+    let redirectTo = "/dashboard"; // default
+    if (profile.role === "super_admin") {
+      redirectTo = "/super-admin";
+    } else if (profile.role === "admin") {
+      redirectTo = "/admin";
+    } else if (profile.role === "teacher") {
+      redirectTo = "/teacher";
+    } else if (profile.role === "student") {
+      redirectTo = "/student";
+    }
+    router.push(redirectTo);
+    // Reset loginSuccess to prevent redirect loop
+    setLoginSuccess(false);
+  }
+
+  if (authLoading && !loginSuccess) {
+    // Show loading state in the button via the loginLoading from useLogin
+    // We don't need to show extra loading here.
   }
 
   return (
@@ -94,10 +123,10 @@ export default function LoginForm() {
 
           <Button
             className="w-full"
-            disabled={loading}
+            disabled={loginLoading}
             type="submit"
           >
-            {loading ? "Signing in..." : "Login"}
+            {loginLoading ? "Signing in..." : "Login"}
           </Button>
         </form>
       </CardContent>

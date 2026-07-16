@@ -1,8 +1,8 @@
 import AuthGuard from "@/features/auth/guards/AuthGuard";
 
-export default function DashboardLayout({ children }) {
+export default function SuperAdminLayout({ children }) {
   return (
-    <AuthGuard>
+    <AuthGuard roles={["super_admin"]}>
       {children}
     </AuthGuard>
   );
