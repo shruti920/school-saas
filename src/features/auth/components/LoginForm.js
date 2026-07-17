@@ -54,7 +54,7 @@ export default function LoginForm() {
     if (profile.role === "super_admin") {
       redirectTo = "/super-admin";
     } else if (profile.role === "admin") {
-      redirectTo = "/admin";
+      redirectTo = "/school-admin";
     } else if (profile.role === "teacher") {
       redirectTo = "/teacher";
     } else if (profile.role === "student") {
