@@ -1,9 +1,12 @@
 import AuthGuard from "@/features/auth/guards/AuthGuard";
+import SuperAdminLayout from "@/features/super-admin/components/layout/SuperAdminLayout";
 
-export default function SuperAdminLayout({ children }) {
+export default function SuperAdminProtectedLayout({ children }) {
   return (
     <AuthGuard roles={["super_admin"]}>
-      {children}
+      <SuperAdminLayout>
+        {children}
+      </SuperAdminLayout>
     </AuthGuard>
   );
 }

@@ -1,14 +1,15 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/features/auth/context/AuthProvider";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
+  weight: ["400", "500"],
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+  weight: ["400", "500"],
   subsets: ["latin"],
 });
 
@@ -24,8 +25,10 @@ export default function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider> {children} </AuthProvider>
-        </body>
+        <ThemeProvider>
+          <AuthProvider> {children} </AuthProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
