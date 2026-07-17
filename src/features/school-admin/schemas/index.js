@@ -87,6 +87,34 @@ export const schoolAdminSchemas = {
     }
   },
 
+  // Academic year schema
+  academicYear: {
+    name: {
+      required: "Academic year name is required",
+      minLength: {
+        value: 4,
+        message: "Academic year name must be at least 4 characters"
+      },
+      maxLength: {
+        value: 20,
+        message: "Academic year name must not exceed 20 characters"
+      },
+      pattern: {
+        value: /^\d{4}-\d{4}$/,
+        message: "Academic year must be in format YYYY-YYYY (e.g., 2024-2025)"
+      }
+    },
+    start_date: {
+      required: "Start date is required"
+    },
+    end_date: {
+      required: "End date is required"
+    },
+    is_current: {
+      // No validation needed for boolean
+    }
+  },
+
   // Staff schema
   staff: {
     firstName: {
@@ -156,6 +184,64 @@ export const schoolAdminSchemas = {
     }
   },
 
+  // Timetable schema
+  timetable: {
+    class_id: {
+      required: "Class is required"
+    },
+    section_id: {
+      required: "Section is required"
+    },
+    subject_id: {
+      required: "Subject is required"
+    },
+    teacher_profile_id: {
+      required: "Teacher is required"
+    },
+    day_of_week: {
+      required: "Day of week is required",
+      min: {
+        value: 1,
+        message: "Day of week must be between 1 (Monday) and 7 (Sunday)"
+      },
+      max: {
+        value: 7,
+        message: "Day of week must be between 1 (Monday) and 7 (Sunday)"
+      }
+    },
+    period_number: {
+      required: "Period number is required",
+      min: {
+        value: 1,
+        message: "Period number must be at least 1"
+      }
+    },
+    start_time: {
+      required: "Start time is required",
+      pattern: {
+        value: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+        message: "Please enter a valid time in HH:MM format"
+      }
+    },
+    end_time: {
+      required: "End time is required",
+      pattern: {
+        value: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+        message: "Please enter a valid time in HH:MM format"
+      }
+    },
+    room: {
+      // Optional field
+    },
+    academic_year: {
+      required: "Academic year is required",
+      pattern: {
+        value: /^\d{4}-\d{4}$/,
+        message: "Academic year must be in format YYYY-YYYY (e.g., 2024-2025)"
+      }
+    }
+  },
+
   // Validation rules
   VALIDATION_RULES: {
     EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -163,10 +249,23 @@ export const schoolAdminSchemas = {
     CLASS_CODE: /^(Nursery|LKG|UKG|[1-9]|1[0-2])$/,
     SECTION: /^[A-Z]$/,
     YEAR: /^\d{4}$/,
+    ACADEMIC_YEAR: /^\d{4}-\d{4}$/,
     ALPHANUMERIC: /^[a-zA-Z0-9\s]+$/,
     ALPHA_ONLY: /^[a-zA-Z\s]+$/
   }
 };
+
+// Export individual schemas
+export const {
+  schoolProfile,
+  academicStructure,
+  academicYear,
+  staff,
+  feeSchedule,
+  VALIDATION_RULES
+} = schoolAdminSchemas;
+
+export default schoolAdminSchemas;
 
 // Export individual schemas
 export const {

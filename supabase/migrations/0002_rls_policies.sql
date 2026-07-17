@@ -159,7 +159,7 @@ create policy schools_insert on public.schools
 for insert with check ( public.is_super_admin() );
 
 create policy schools_update on public.schools
-for update using ( public.is_super_admin() );
+for update using ( public.is_super_admin() or public.is_admin_of(id) );
 
 create policy schools_delete on public.schools
 for delete using ( public.is_super_admin() );

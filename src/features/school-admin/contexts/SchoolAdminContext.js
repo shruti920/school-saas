@@ -15,6 +15,7 @@ export const SchoolAdminProvider = ({ children }) => {
   const [configurationData, setConfigurationData] = useState(null);
   const [setupSteps, setSetupSteps] = useState([]);
   const [readinessStatus, setReadinessStatus] = useState(null);
+  const [schoolProfile, setSchoolProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [schoolId, setSchoolId] = useState(null);
@@ -27,7 +28,18 @@ export const SchoolAdminProvider = ({ children }) => {
     const getSession = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setSchoolId(user.school_id || user.schoolId);
+        // Get school_id from profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('school_id')
+          .eq('id', user.id)
+          .single();
+
+        if (!profileError && profile) {
+          setSchoolId(profile.school_id);
+        } else {
+          setSchoolId(null);
+        }
       } else {
         setSchoolId(null);
       }
@@ -38,7 +50,18 @@ export const SchoolAdminProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
-          setSchoolId(session.user.school_id || session.user.schoolId);
+          // Get school_id from profiles table
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('school_id')
+            .eq('id', session.user.id)
+            .single();
+
+          if (!profileError && profile) {
+            setSchoolId(profile.school_id);
+          } else {
+            setSchoolId(null);
+          }
         } else {
           setSchoolId(null);
         }
@@ -105,23 +128,25 @@ export const SchoolAdminProvider = ({ children }) => {
     }
   }, [schoolId]);
 
-  const fetchSetupSteps = useCallback(async () => {
+  const fetchSchoolProfile = useCallback(async () => {
     if (!schoolId) {
-      setError(new Error("School ID not available"));
+      setSchoolProfile(null);
       return;
     }
     try {
-      setLoading(true);
-      setError(null);
-      const data = await schoolAdminService.getSetupSteps(schoolId);
-      setSetupSteps(data);
+      const { data, error } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('id', schoolId)
+        .single();
+
+      if (error) throw error;
+      setSchoolProfile(data);
     } catch (err) {
-      setError(err);
-      setSetupSteps([]);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching school profile:', err);
+      setSchoolProfile(null);
     }
-  }, [schoolId]);
+  }, [schoolId, supabase]);
 
   const fetchReadinessStatus = useCallback(async () => {
     if (!schoolId) {
@@ -156,7 +181,8 @@ export const SchoolAdminProvider = ({ children }) => {
           fetchAcademicData(),
           fetchConfigurationData(),
           fetchSetupSteps(),
-          fetchReadinessStatus()
+          fetchReadinessStatus(),
+          fetchSchoolProfile()
         ]);
       } catch (err) {
         setError(err);
@@ -164,7 +190,7 @@ export const SchoolAdminProvider = ({ children }) => {
         setLoading(false);
       }
     });
-  }, [schoolId, fetchDashboardData, fetchAcademicData, fetchConfigurationData, fetchSetupSteps, fetchReadinessStatus]);
+  }, [schoolId, fetchDashboardData, fetchAcademicData, fetchConfigurationData, fetchSetupSteps, fetchReadinessStatus, fetchSchoolProfile]);
 
   // Initial load - run when schoolId changes
   useEffect(() => {
@@ -221,6 +247,7 @@ export const SchoolAdminProvider = ({ children }) => {
     configurationData,
     setupSteps,
     readinessStatus,
+    schoolProfile,
 
     // Loading states
     loading,

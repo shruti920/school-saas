@@ -397,6 +397,64 @@ export const schoolAdminService = {
     }
   },
 
+  createTimetableSlot: async (school_id, timetableData) => {
+    try {
+      const { data, error } = await supabase.from("timetable_slots").insert({
+        school_id,
+        class_id: timetableData.class_id,
+        section_id: timetableData.section_id,
+        subject_id: timetableData.subject_id,
+        teacher_profile_id: timetableData.teacher_profile_id,
+        day_of_week: timetableData.day_of_week,
+        period_number: timetableData.period_number,
+        start_time: timetableData.start_time,
+        end_time: timetableData.end_time,
+        room: timetableData.room || null,
+        academic_year: timetableData.academic_year
+      }).select().single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error creating timetable slot:", error);
+      throw error;
+    }
+  },
+
+  updateTimetableSlot: async (timetableId, timetableData) => {
+    try {
+      const { data, error } = await supabase.from("timetable_slots").update({
+        class_id: timetableData.class_id,
+        section_id: timetableData.section_id,
+        subject_id: timetableData.subject_id,
+        teacher_profile_id: timetableData.teacher_profile_id,
+        day_of_week: timetableData.day_of_week,
+        period_number: timetableData.period_number,
+        start_time: timetableData.start_time,
+        end_time: timetableData.end_time,
+        room: timetableData.room || null,
+        academic_year: timetableData.academic_year
+      }).eq("id", timetableId).select().single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error updating timetable slot:", error);
+      throw error;
+    }
+  },
+
+  deleteTimetableSlot: async (timetableId) => {
+    try {
+      const { error } = await supabase.from("timetable_slots").delete().eq("id", timetableId);
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting timetable slot:", error);
+      throw error;
+    }
+  },
+
   // Transport data
   getTransportData: async (school_id) => {
     try {
@@ -443,6 +501,224 @@ export const schoolAdminService = {
     }
   },
 
+  // School profile
+  getSchool: async (school_id) => {
+    try {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("*")
+        .eq("id", school_id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error fetching school:", error);
+      throw error;
+    }
+  },
+
+  updateSchool: async (school_id, schoolData) => {
+    try {
+      const { data, error } = await supabase
+        .from("schools")
+        .update({
+          name: schoolData.name,
+          state: schoolData.state,
+          board_type: schoolData.board_type,
+          address: schoolData.address,
+          academic_year_start: schoolData.academic_year_start,
+          academic_year_end: schoolData.academic_year_end,
+          is_active: schoolData.is_active
+        })
+        .eq("id", school_id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error updating school:", error);
+      throw error;
+    }
+  },
+
+  // Academic year methods
+  getAcademicYears: async (school_id) => {
+    try {
+      const { data, error } = await supabase
+        .from("academic_years")
+        .select("*")
+        .eq("school_id", school_id)
+        .order("start_date", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching academic years:", error);
+      throw error;
+    }
+  },
+
+  getCurrentAcademicYear: async (school_id) => {
+    try {
+      const { data, error } = await supabase
+        .from("academic_years")
+        .select("*")
+        .eq("school_id", school_id)
+        .eq("is_current", true)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 means no rows returned
+      return data;
+    } catch (error) {
+      console.error("Error fetching current academic year:", error);
+      throw error;
+    }
+  },
+
+  createAcademicYear: async (school_id, academicYearData) => {
+    try {
+      // If this is set as current, unset any existing current year for this school
+      if (academicYearData.is_current) {
+        await supabase
+          .from("academic_years")
+          .update({ is_current: false })
+          .eq("school_id", school_id);
+      }
+
+      const { data, error } = await supabase
+        .from("academic_years")
+        .insert({
+          school_id,
+          name: academicYearData.name,
+          start_date: academicYearData.start_date,
+          end_date: academicYearData.end_date,
+          is_current: academicYearData.is_current || false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error creating academic year:", error);
+      throw error;
+    }
+  },
+
+  updateAcademicYear: async (academicYearId, academicYearData) => {
+    try {
+      // If this is set as current, unset any existing current year for this school
+      if (academicYearData.is_current) {
+        // First get the school_id for this academic year
+        const { data: currentYear, error: fetchError } = await supabase
+          .from("academic_years")
+          .select("school_id")
+          .eq("id", academicYearId)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // Unset any existing current year for this school
+        await supabase
+          .from("academic_years")
+          .update({ is_current: false })
+          .eq("school_id", currentYear.school_id);
+      }
+
+      const { data, error } = await supabase
+        .from("academic_years")
+        .update({
+          name: academicYearData.name,
+          start_date: academicYearData.start_date,
+          end_date: academicYearData.end_date,
+          is_current: academicYearData.is_current || false
+        })
+        .eq("id", academicYearId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error updating academic year:", error);
+      throw error;
+    }
+  },
+
+  deleteAcademicYear: async (academicYearId) => {
+    try {
+      // Check if this is the current year
+      const { data: academicYear, error: fetchError } = await supabase
+        .from("academic_years")
+        .select("school_id, is_current")
+        .eq("id", academicYearId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Prevent deletion of current year if it's the only one
+      if (academicYear.is_current) {
+        const { count, error: countError } = await supabase
+          .from("academic_years")
+          .select("id", { count: "exact", head: true })
+          .eq("school_id", academicYear.school_id)
+          .eq("is_current", true);
+
+        if (countError) throw countError;
+
+        if (count === 1) {
+          throw new Error("Cannot delete the current academic year");
+        }
+      }
+
+      const { error } = await supabase
+        .from("academic_years")
+        .delete()
+        .eq("id", academicYearId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting academic year:", error);
+      throw error;
+    }
+  },
+
+  setCurrentAcademicYear: async (academicYearId) => {
+    try {
+      // Get the academic year to get its school_id
+      const { data: academicYear, error: fetchError } = await supabase
+        .from("academic_years")
+        .select("school_id")
+        .eq("id", academicYearId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Unset all current years for this school
+      await supabase
+        .from("academic_years")
+        .update({ is_current: false })
+        .eq("school_id", academicYear.school_id);
+
+      // Set this academic year as current
+      const { data, error } = await supabase
+        .from("academic_years")
+        .update({ is_current: true })
+        .eq("id", academicYearId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error setting current academic year:", error);
+      throw error;
+    }
+  },
+
   // Utility functions
   formatCurrency: (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -483,7 +759,20 @@ export const {
   deleteSection,
   // Timetable and transport
   getTimetableSlots,
+  createTimetableSlot,
+  updateTimetableSlot,
+  deleteTimetableSlot,
   getTransportData,
   createTransportRoute,
-  deleteTransportRoute
+  deleteTransportRoute,
+  // School profile
+  getSchool,
+  updateSchool,
+  // Academic year
+  getAcademicYears,
+  getCurrentAcademicYear,
+  createAcademicYear,
+  updateAcademicYear,
+  deleteAcademicYear,
+  setCurrentAcademicYear
 } = schoolAdminService;
