@@ -1,263 +1,82 @@
 import * as React from "react";
 import { Card, CardContent, CardHeader, Title } from "@/components/ui/card";
 import { CheckCircle, Settings, Users, Calendar, Banknote, Bus, Bed, BookOpen, Bell } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useSetupProgress } from "@/features/school-admin/hooks/useSchoolAdminData";
+
+const stepIcons = {
+  "School Profile": Settings,
+  "Academic Structure": Calendar,
+  "Staff & Faculty": Users,
+  "Fee Structure": Banknote,
+  Transport: Bus,
+  Hostel: Bed,
+  Library: BookOpen,
+  Notifications: Bell
+};
 
 export default function SetupWizard() {
-  const [activeStep, setActiveStep] = React.useState(0);
-  const steps = [
-    { id: 1, title: "School Profile", icon: Settings, description: "Basic school information" },
-    { id: 2, title: "Academic Structure", icon: Calendar, description: "Classes, sections, subjects" },
-    { id: 3, title: "Staff & Faculty", icon: Users, description: "Teachers and staff setup" },
-    { id: 4, title: "Fee Structure", icon: Banknote, description: "Fee categories and payment schedules" },
-    { id: 5, title: "Transport", icon: Bus, description: "Bus routes and vehicle management" },
-    { id: 6, title: "Hostel", icon: Bed, description: "Hostel facilities and room management" },
-    { id: 7, title: "Library", icon: BookOpen, description: "Library inventory and lending policies" },
-    { id: 8, title: "Notifications", icon: Bell, description: "Communication templates and preferences" }
-  ];
+  const { steps, loading, error } = useSetupProgress();
+  const completedSteps = steps.filter((step) => step.completed).length;
+  const progressPercent = steps.length ? Math.round((completedSteps / steps.length) * 100) : 0;
 
-  const methods = useForm({
-    defaultValues: {
-      schoolName: "",
-      state: "",
-      boardType: "CBSE",
-      academicYearStart: "",
-      academicYearEnd: "",
-      contactPerson: "",
-      contactEmail: "",
-      contactPhone: "",
-      address: ""
-    }
-  });
-
-  const { handleSubmit, reset, setValue, watch } = methods;
-
-  const onSubmit = (data) => {
-    console.log("Form data:", data);
-    // In real implementation, this would save to Supabase
-    alert("Setup step completed!");
-    if (activeStep < steps.length - 1) {
-      setActiveStep(activeStep + 1);
-    } else {
-      alert("Setup complete! Welcome to School Management System.");
-    }
-    reset();
-  };
-
-  const goToNext = () => {
-    if (activeStep < steps.length - 1) {
-      setActiveStep(activeStep + 1);
-    }
-  };
-
-  const goToPrevious = () => {
-    if (activeStep > 0) {
-      setActiveStep(activeStep - 1);
-    }
-  };
-
-  const progressPercent = ((activeStep + 1) / steps.length) * 100;
+  if (loading) return <div className="text-center py-12">Loading setup progress...</div>;
+  if (error) return <div className="text-center text-destructive p-6">Error loading setup progress: {error.message}</div>;
 
   return (
     <div className="space-y-6">
-      {/* Progress Bar */}
       <div className="space-y-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium">Setup Progress</span>
-          <span className="text-sm font-semibold">{Math.round(progressPercent)}%</span>
+          <span className="text-sm font-semibold">{progressPercent}%</span>
         </div>
         <div className="w-full bg-muted/50 h-2.5 rounded-full overflow-hidden">
-          <div className={`bg-primary h-2.5 transition-width duration-500`} style={{ width: `${progressPercent}%` }}></div>
+          <div className="bg-primary h-2.5 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
         </div>
       </div>
 
-      {/* Step Indicator */}
-      <div className="flex items-center space-x-4 mb-6">
-        {steps.map((step, index) => (
-          <div key={step.id} className="flex items-center space-x-2">
-            <div className={`w-8 h-8 flex items-center justify-center rounded-lg
-              ${activeStep > index ? 'bg-primary text-primary-foreground' : ''}
-              ${activeStep === index ? 'bg-primary/20 text-primary' : 'bg-muted/50 text-muted-foreground'}
-              transition-all duration-300`}>
-              {activeStep > index ? (
-                <CheckCircle className="h-4 w-4" />
-              ) : (
-                <div className={`text-xs font-medium ${activeStep === index ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {index + 1}
-                </div>
-              )}
-            </div>
-            <div className={`text-xs font-medium
-              ${activeStep >= index ? 'text-primary' : 'text-muted-foreground'}`}>
-              {step.title}
-            </div>
-            {index < steps.length - 1 && (
-              <div className="w-px h-4 bg-muted/50 mx-2"></div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Step Content */}
       <Card>
         <CardHeader className="pb-4">
-          <Title variant="h2">{steps[activeStep].title}</Title>
-          <p className="text-sm text-muted-foreground">{steps[activeStep].description}</p>
+          <Title variant="h2">Setup Wizard</Title>
+          <p className="text-sm text-muted-foreground">Track completion of your school setup steps and launch the admin panel.</p>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* School Profile Step */}
-            {activeStep === 0 && (
-              <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">School Name</label>
-                    <input
-                      {...methods.register("schoolName", {
-                        required: "School name is required",
-                        minLength: {
-                          value: 2,
-                          message: "School name must be at least 2 characters"
-                        }
-                      })}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="Enter school name"
-                    />
-                    {methods.formState.errors.schoolName && (
-                      <p className="text-xs text-destructive mt-1">{methods.formState.errors.schoolName.message}</p>
-                    )}
+        <CardContent className="space-y-4">
+          {steps.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No setup steps available for this school yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {steps.map((step) => {
+                const Icon = stepIcons[step.name] || Settings;
+                return (
+                  <div
+                    key={step.id}
+                    className={`rounded-lg border p-4 transition-colors ${step.completed ? "border-primary/20 bg-primary/5" : "border-border bg-muted/50"}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{step.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {step.completed ? "Completed" : "Pending configuration"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${step.completed ? "bg-primary/10 text-primary" : "bg-muted/100 text-muted-foreground"}`}>
+                        {step.completed ? "Complete" : "Pending"}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">State</label>
-                    <input
-                      {...methods.register("state", {
-                        required: "State is required",
-                        minLength: {
-                          value: 2,
-                          message: "State must be at least 2 characters"
-                        }
-                      })}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="Enter state"
-                    />
-                    {methods.formState.errors.state && (
-                      <p className="text-xs text-destructive mt-1">{methods.formState.errors.state.message}</p>
-                    )}
-                  </div>
-                </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Board Type</label>
-                    <select
-                      {...methods.register("boardType")}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="CBSE">CBSE</option>
-                      <option value="ICSE">ICSE</option>
-                      <option value="STATE">State Board</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Academic Year Start</label>
-                    <input
-                      type="date"
-                      {...methods.register("academicYearStart", {
-                        required: "Start date is required"
-                      })}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    {methods.formState.errors.academicYearStart && (
-                      <p className="text-xs text-destructive mt-1">{methods.formState.errors.academicYearStart.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Academic Year End</label>
-                    <input
-                      type="date"
-                      {...methods.register("academicYearEnd", {
-                        required: "End date is required"
-                      })}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    {methods.formState.errors.academicYearEnd && (
-                      <p className="text-xs text-destructive mt-1">{methods.formState.errors.academicYearEnd.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Contact Person</label>
-                    <input
-                      {...methods.register("contactPerson")}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="Principal or admin contact"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Contact Email</label>
-                    <input
-                      type="email"
-                      {...methods.register("contactEmail", {
-                        required: "Email is required",
-                        pattern: {
-                          value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                          message: "Please enter a valid email address"
-                        }
-                      })}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="contact@school.edu"
-                    />
-                    {methods.formState.errors.contactEmail && (
-                      <p className="text-xs text-destructive mt-1">{methods.formState.errors.contactEmail.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Contact Phone</label>
-                    <input
-                      type="tel"
-                      {...methods.register("contactPhone", {
-                        pattern: {
-                          value: /^\+?[\d\s-]{10,}$/,
-                          message: "Please enter a valid phone number"
-                        }
-                      })}
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="+91 XXXXXXXXXX"
-                    />
-                    {methods.formState.errors.contactPhone && (
-                      <p className="text-xs text-destructive mt-1">{methods.formState.errors.contactPhone.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Address</label>
-                  <textarea
-                    {...methods.register("address", {
-                      required: "Address is required",
-                      minLength: {
-                        value: 10,
-                        message: "Address must be at least 10 characters"
-                      }
-                    })}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    rows="3"
-                    placeholder="Enter full school address"
-                  />
-                  {methods.formState.errors.address && (
-                    <p className="text-xs text-destructive mt-1">{methods.formState.errors.address.message}</p>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Academic Structure Step */}
-            {activeStep === 1 && (
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>

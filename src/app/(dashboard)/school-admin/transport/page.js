@@ -1,11 +1,12 @@
-import { Card, CardContent, CardHeader, Title } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bus } from "lucide-react";
 
 export default function TransportPage() {
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader className="pb-4">
-          <Title variant="h2">Transport Management</Title>
+          <CardTitle variant="h2">Transport Management</CardTitle>
           <p className="text-sm text-muted-foreground">
             Manage school transportation including bus routes, vehicles, and student assignments
           </p>

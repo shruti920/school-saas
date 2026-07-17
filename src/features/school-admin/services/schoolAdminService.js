@@ -9,19 +9,32 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Service functions for school administration
 export const schoolAdminService = {
   // Dashboard data
-  getDashboardStats: async () => {
+  getDashboardStats: async (school_id) => {
     try {
       // In a real implementation, these would be actual Supabase queries
-      const [studentsCount, revenueData, attendanceData] = await Promise.all([
-        supabase.from("students").select("*", { count: "exact" }),
-        supabase.from("fee_payments").select("amount_paid"),
-        supabase.from("attendance").select("status"),
+      const [studentsCount, revenueData, attendanceData, staffAttendanceData, totalStudentsCount, totalStaffCount] = await Promise.all([
+        supabase.from("students").select("*", { count: "exact" }).eq("school_id", school_id),
+        supabase.from("fee_payments").select("amount_paid").eq("school_id", school_id),
+        supabase.from("attendance").select("status").eq("school_id", school_id).eq("date", new Date().toISOString().split('T')[0]),
+        supabase.from("staff_attendance").select("status").eq("school_id", school_id).eq("date", new Date().toISOString().split('T')[0]),
+        supabase.from("students").select("*", { count: "exact" }).eq("school_id", school_id),
+        supabase.from("profiles").select("*", { count: "exact" }).eq("school_id", school_id).in("role", ["admin", "teacher", "accountant", "front_office", "librarian", "transport_manager"])
       ]);
 
+      const totalStudents = totalStudentsCount.count || 0;
+      const totalStaff = totalStaffCount.count || 0;
+
+      const presentStudents = attendanceData.data?.filter(record => record.status === 'present').length || 0;
+      const studentAttendanceRate = totalStudents > 0 ? (presentStudents / totalStudents) * 100 : 0;
+
+      const presentStaff = staffAttendanceData.data?.filter(record => record.status === 'present').length || 0;
+      const staffAttendanceRate = totalStaff > 0 ? (presentStaff / totalStaff) * 100 : 0;
+
       return {
-        students: studentsCount.count || 0,
+        students: totalStudents,
         revenue: revenueData.data?.reduce((sum, payment) => sum + (payment.amount_paid || 0), 0) || 0,
-        attendanceRate: 0 // Calculate from attendance data
+        attendanceRate: parseFloat(studentAttendanceRate.toFixed(2)),
+        teacherAttendance: parseFloat(staffAttendanceRate.toFixed(2))
       };
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -30,19 +43,32 @@ export const schoolAdminService = {
   },
 
   // Academic data
-  getAcademicData: async () => {
+  getAcademicData: async (school_id) => {
     try {
       const [classes, subjects, exams] = await Promise.all([
         supabase.from("classes").select(`
           *,
           sections:sections(*),
           students:students(count)
-        `),
-        supabase.from("subjects").select("*"),
+        `).eq("school_id", school_id).order("sort_order", { ascending: true }),
+        supabase.from("subjects").select(`
+          id,
+          name,
+          code,
+          periods_per_week
+        `).eq("school_id", school_id).order("name", { ascending: true }),
         supabase.from("exams").select(`
           *,
-          exam_schedule:exam_schedule(*)
-        `),
+          exam_schedule:exam_schedule(
+            id,
+            class:classes(id,name),
+            subject:subjects(id,name),
+            exam_date,
+            start_time,
+            end_time,
+            room
+          )
+        `).eq("school_id", school_id).order("start_date", { ascending: true }),
       ]);
 
       return {
@@ -56,19 +82,204 @@ export const schoolAdminService = {
     }
   },
 
-  // Configuration data
-  getConfiguration: async () => {
+  // Class management
+  createClass: async (school_id, classData) => {
     try {
-      const [infrastructure, departments, policies] = await Promise.all([
-        supabase.from("infrastructure").select("*"),
-        supabase.from("departments").select("*"),
-        supabase.from("policies").select("*"),
+      const { data, error } = await supabase
+        .from("classes")
+        .insert({
+          school_id,
+          name: classData.name,
+          sort_order: classData.sort_order || 0
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error creating class:", error);
+      throw error;
+    }
+  },
+
+  updateClass: async (classId, classData) => {
+    try {
+      const { data, error } = await supabase
+        .from("classes")
+        .update({
+          name: classData.name,
+          sort_order: classData.sort_order || 0
+        })
+        .eq("id", classId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error updating class:", error);
+      throw error;
+    }
+  },
+
+  deleteClass: async (classId) => {
+    try {
+      const { error } = await supabase
+        .from("classes")
+        .delete()
+        .eq("id", classId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      throw error;
+    }
+  },
+
+  // Subject management
+  createSubject: async (school_id, subjectData) => {
+    try {
+      const { data, error } = await supabase
+        .from("subjects")
+        .insert({
+          school_id,
+          name: subjectData.name,
+          code: subjectData.code,
+          periods_per_week: subjectData.periodsPerWeek || 4
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error creating subject:", error);
+      throw error;
+    }
+  },
+
+  updateSubject: async (subjectId, subjectData) => {
+    try {
+      const { data, error } = await supabase
+        .from("subjects")
+        .update({
+          name: subjectData.name,
+          code: subjectData.code,
+          periods_per_week: subjectData.periodsPerWeek || 4
+        })
+        .eq("id", subjectId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error updating subject:", error);
+      throw error;
+    }
+  },
+
+  deleteSubject: async (subjectId) => {
+    try {
+      const { error } = await supabase
+        .from("subjects")
+        .delete()
+        .eq("id", subjectId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting subject:", error);
+      throw error;
+    }
+  },
+
+  // Section management
+  createSection: async (school_id, classId, sectionData) => {
+    try {
+      const { data, error } = await supabase
+        .from("sections")
+        .insert({
+          school_id,
+          class_id: classId,
+          name: sectionData.name
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error creating section:", error);
+      throw error;
+    }
+  },
+
+  updateSection: async (sectionId, sectionData) => {
+    try {
+      const { data, error } = await supabase
+        .from("sections")
+        .update({
+          name: sectionData.name
+        })
+        .eq("id", sectionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error updating section:", error);
+      throw error;
+    }
+  },
+
+  deleteSection: async (sectionId) => {
+    try {
+      const { error } = await supabase
+        .from("sections")
+        .delete()
+        .eq("id", sectionId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting section:", error);
+      throw error;
+    }
+  },
+
+  // Configuration data
+  getConfiguration: async (school_id) => {
+    try {
+      const [classesCount, subjectsCount, transportCount, libraryCount, hostelCount, notificationsCount, feeStructuresCount, staffCount] = await Promise.all([
+        supabase.from("classes").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("subjects").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("transport_routes").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("library_books").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("hostel_rooms").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("notifications").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("fee_structures").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("school_id", school_id).in("role", ["admin", "teacher", "accountant", "front_office", "librarian", "transport_manager"]),
       ]);
 
       return {
-        infrastructure: infrastructure.data || [],
-        departments: departments.data || [],
-        policies: policies.data || []
+        infrastructure: [
+          { id: 1, name: "Classrooms", count: classesCount.count || 0, status: classesCount.count > 0 ? "Configured" : "Pending" },
+          { id: 2, name: "Transport Routes", count: transportCount.count || 0, status: transportCount.count > 0 ? "Configured" : "Pending" },
+          { id: 3, name: "Library Books", count: libraryCount.count || 0, status: libraryCount.count > 0 ? "Configured" : "Pending" },
+          { id: 4, name: "Hostel Rooms", count: hostelCount.count || 0, status: hostelCount.count > 0 ? "Configured" : "Pending" },
+        ],
+        departments: [
+          { id: 1, name: "Subjects", hod: "Academic", faculty: subjectsCount.count || 0, students: 0 },
+          { id: 2, name: "Teachers", hod: "Staff", faculty: staffCount.count || 0, students: 0 },
+        ],
+        policies: [
+          { id: 1, name: "Notifications", lastUpdated: null, version: notificationsCount.count > 0 ? "Enabled" : "Not configured" },
+          { id: 2, name: "Fee Structure", lastUpdated: null, version: feeStructuresCount.count > 0 ? "Enabled" : "Not configured" }
+        ]
       };
     } catch (error) {
       console.error("Error fetching configuration:", error);
@@ -77,21 +288,42 @@ export const schoolAdminService = {
   },
 
   // Setup wizard data
-  getSetupSteps: async () => {
+  getSetupSteps: async (school_id) => {
     try {
-      const steps = [
-        { id: 1, name: "School Profile", completed: false },
-        { id: 2, name: "Academic Structure", completed: false },
-        { id: 3, name: "Staff & Faculty", completed: false },
-        { id: 4, name: "Fee Structure", completed: false },
-        { id: 5, name: "Transport", completed: false },
-        { id: 6, name: "Hostel", completed: false },
-        { id: 7, name: "Library", completed: false },
-        { id: 8, name: "Notifications", completed: false }
-      ];
+      const [schoolResponse, classesResponse, sectionsResponse, subjectsResponse, teachersResponse, feeStructuresResponse, transportRoutesResponse, hostelRoomsResponse, libraryBooksResponse, notificationsResponse, timetableResponse] = await Promise.all([
+        supabase.from("schools").select("id").eq("id", school_id).single(),
+        supabase.from("classes").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("sections").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("subjects").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("school_id", school_id).in("role", ["admin", "teacher", "accountant", "front_office", "librarian", "transport_manager"]),
+        supabase.from("fee_structures").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("transport_routes").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("hostel_rooms").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("library_books").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("notifications").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("timetable_slots").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+      ]);
 
-      // In a real app, we'd check completion status from database
-      return steps;
+      const academicComplete = classesResponse.count > 0 && sectionsResponse.count > 0 && subjectsResponse.count > 0;
+      const staffComplete = teachersResponse.count > 0;
+      const feeComplete = feeStructuresResponse.count > 0;
+      const transportComplete = transportRoutesResponse.count > 0;
+      const hostelComplete = hostelRoomsResponse.count > 0;
+      const libraryComplete = libraryBooksResponse.count > 0;
+      const notificationsComplete = notificationsResponse.count > 0;
+      const calendarComplete = timetableResponse.count > 0;
+
+      return [
+        { id: 1, name: "School Profile", completed: !!schoolResponse.data },
+        { id: 2, name: "Academic Structure", completed: academicComplete },
+        { id: 3, name: "Staff & Faculty", completed: staffComplete },
+        { id: 4, name: "Fee Structure", completed: feeComplete },
+        { id: 5, name: "Transport", completed: transportComplete },
+        { id: 6, name: "Hostel", completed: hostelComplete },
+        { id: 7, name: "Library", completed: libraryComplete },
+        { id: 8, name: "Notifications", completed: notificationsComplete },
+        { id: 9, name: "Academic Calendar", completed: calendarComplete }
+      ];
     } catch (error) {
       console.error("Error fetching setup steps:", error);
       throw error;
@@ -99,23 +331,114 @@ export const schoolAdminService = {
   },
 
   // Validation and readiness
-  getReadinessStatus: async () => {
+  getReadinessStatus: async (school_id) => {
     try {
-      // This would check various completion statuses
-      const readinessData = {
-        score: 78, // Example score
-        checks: [
-          { id: 1, title: "School Profile", status: "complete" },
-          { id: 2, title: "Academic Structure", status: "complete" },
-          { id: 3, title: "Staff Information", status: "partial" },
-          { id: 4, title: "Fee Structure", status: "incomplete" },
-          // ... more checks
-        ]
-      };
+      const [schoolResponse, classesResponse, sectionsResponse, subjectsResponse, teachersResponse, feeStructuresResponse, transportRoutesResponse, hostelRoomsResponse, libraryBooksResponse, notificationsResponse, timetableResponse] = await Promise.all([
+        supabase.from("schools").select("id").eq("id", school_id).single(),
+        supabase.from("classes").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("sections").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("subjects").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("school_id", school_id).in("role", ["admin", "teacher", "accountant", "front_office", "librarian", "transport_manager"]),
+        supabase.from("fee_structures").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("transport_routes").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("hostel_rooms").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("library_books").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("notifications").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+        supabase.from("timetable_slots").select("id", { count: "exact", head: true }).eq("school_id", school_id),
+      ]);
 
-      return readinessData;
+      const checks = [
+        { id: 1, title: "School Profile", status: schoolResponse.data ? "complete" : "incomplete", category: "Profile" },
+        { id: 2, title: "Academic Structure", status: classesResponse.count > 0 && sectionsResponse.count > 0 && subjectsResponse.count > 0 ? "complete" : "partial", category: "Academic" },
+        { id: 3, title: "Staff Information", status: teachersResponse.count > 0 ? "complete" : "incomplete", category: "Staff" },
+        { id: 4, title: "Fee Structure", status: feeStructuresResponse.count > 0 ? "complete" : "incomplete", category: "Finance" },
+        { id: 5, title: "Transport Routes", status: transportRoutesResponse.count > 0 ? "complete" : "incomplete", category: "Transport" },
+        { id: 6, title: "Hostel Facilities", status: hostelRoomsResponse.count > 0 ? "complete" : "incomplete", category: "Hostel" },
+        { id: 7, title: "Library Inventory", status: libraryBooksResponse.count > 0 ? "complete" : "incomplete", category: "Library" },
+        { id: 8, title: "Notifications", status: notificationsResponse.count > 0 ? "complete" : "incomplete", category: "Communication" },
+        { id: 9, title: "Academic Calendar", status: timetableResponse.count > 0 ? "complete" : "incomplete", category: "Calendar" }
+      ];
+
+      const completeCount = checks.filter(check => check.status === "complete").length;
+      const partialCount = checks.filter(check => check.status === "partial").length;
+      const score = Math.round(((completeCount * 1 + partialCount * 0.5) / checks.length) * 100);
+
+      return {
+        score,
+        checks,
+      };
     } catch (error) {
       console.error("Error fetching readiness status:", error);
+      throw error;
+    }
+  },
+
+  // Timetable data
+  getTimetableSlots: async (school_id) => {
+    try {
+      const { data, error } = await supabase.from("timetable_slots").select(`
+        id,
+        day_of_week,
+        period_number,
+        start_time,
+        end_time,
+        room,
+        class:classes(id,name),
+        section:sections(id,name),
+        subject:subjects(id,name),
+        teacher:profiles(id,full_name)
+      `).eq("school_id", school_id).order("day_of_week", { ascending: true }).order("period_number", { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching timetable slots:", error);
+      throw error;
+    }
+  },
+
+  // Transport data
+  getTransportData: async (school_id) => {
+    try {
+      const { data, error } = await supabase.from("transport_routes").select(`
+        *,
+        route_students:student_transport(id)
+      `).eq("school_id", school_id).order("route_name", { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching transport data:", error);
+      throw error;
+    }
+  },
+
+  createTransportRoute: async (school_id, routeData) => {
+    try {
+      const { data, error } = await supabase.from("transport_routes").insert({
+        school_id,
+        route_name: routeData.route_name,
+        vehicle_number: routeData.vehicle_number,
+        driver_name: routeData.driver_name,
+        driver_phone: routeData.driver_phone,
+        capacity: routeData.capacity || 0
+      }).select().single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error creating transport route:", error);
+      throw error;
+    }
+  },
+
+  deleteTransportRoute: async (routeId) => {
+    try {
+      const { error } = await supabase.from("transport_routes").delete().eq("id", routeId);
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting transport route:", error);
       throw error;
     }
   },
@@ -145,5 +468,22 @@ export const {
   getSetupSteps,
   getReadinessStatus,
   formatCurrency,
-  formatDate
+  formatDate,
+  // Class management
+  createClass,
+  updateClass,
+  deleteClass,
+  // Subject management
+  createSubject,
+  updateSubject,
+  deleteSubject,
+  // Section management
+  createSection,
+  updateSection,
+  deleteSection,
+  // Timetable and transport
+  getTimetableSlots,
+  getTransportData,
+  createTransportRoute,
+  deleteTransportRoute
 } = schoolAdminService;

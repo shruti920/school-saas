@@ -5,14 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { Search, Bell, UserCircle, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
-export default function SchoolAdminHeader() {
+export default function SchoolAdminHeader({ isSidebarOpen, setIsSidebarOpen }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
 
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  const handleSearch = (e) => {
+  const handleOnSearch = (e) => {
     e.preventDefault();
     // Handle search functionality
     console.log("Searching for:", searchQuery);
@@ -28,14 +28,16 @@ export default function SchoolAdminHeader() {
     console.log("Profile clicked");
   };
 
+  const handleMenuToggle = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
   return (
     <header className="lg:hidden h-16 bg-sidebar border-b border-border flex items-center justify-between px-4">
       <div className="flex items-center space-x-3">
         <button
-          className="p-2 rounded-md hover:bg-muted shrink-0"
-          onClick={() => {
-            // Toggle sidebar in mobile view - would typically use state management
-          }}
+          className="p-2 rounded-md hover:bg-sidebar/50 shrink-0"
+          onClick={handleMenuToggle}
         >
           <Menu className="h-4 w-4 text-sidebar-foreground" />
         </button>
@@ -49,7 +51,7 @@ export default function SchoolAdminHeader() {
 
       <div className="flex items-center space-x-4">
         {/* Search */}
-        <form onSubmit={handleSearch} className="hidden lg:flex items-center space-x-2">
+        <form onSubmit={handleOnSearch} className="hidden lg:flex items-center space-x-2">
           <Search className="h-4 w-4 text-sidebar-foreground" />
           <input
             type="text"
@@ -58,14 +60,14 @@ export default function SchoolAdminHeader() {
             placeholder="Search..."
             className="px-3 py-1 bg-muted border border-border rounded-md text-sidebar-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
-          <button type="submit" className="p-2 rounded-md hover:bg-muted">
+          <button type="submit" className="p-2 rounded-md hover:bg-sidebar/50">
             <Search className="h-4 w-4 text-sidebar-foreground" />
           </button>
         </form>
 
         {/* Notifications */}
         <button
-          className="relative p-2 rounded-md hover:bg-muted"
+          className="relative p-2 rounded-md hover:bg-sidebar/50"
           onClick={handleNotificationClick}
         >
           <Bell className="h-4 w-4 text-sidebar-foreground" />
@@ -77,7 +79,7 @@ export default function SchoolAdminHeader() {
 
         {/* Theme Toggle */}
         <button
-          className="p-2 rounded-md hover:bg-muted"
+          className="p-2 rounded-md hover:bg-sidebar/50"
           onClick={toggleTheme}
         >
           {theme === "dark" ? (
@@ -90,7 +92,7 @@ export default function SchoolAdminHeader() {
         {/* User Profile */}
         <div className="relative">
           <button
-            className="p-2 rounded-md hover:bg-muted"
+            className="p-2 rounded-md hover:bg-sidebar/50"
             onClick={handleProfileClick}
           >
             <UserCircle className="h-4 w-4 text-sidebar-foreground" />

@@ -1,26 +1,26 @@
 import * as React from "react";
 import { Card, CardContent, CardHeader, Title } from "@/components/ui/card";
 import { ShieldCheck, AlertTriangle, CheckCircle, Loader2, TrendingUp, Users, Calendar, Banknote } from "lucide-react";
+import { useReadinessStatus } from "@/features/school-admin/hooks/useSchoolAdminData";
 
 export default function ValidationReadiness() {
-  const [readinessScore, setReadinessScore] = React.useState(78);
-  const [checks, setChecks] = React.useState([
-    { id: 1, title: "School Profile Complete", status: "complete", category: "Profile" },
-    { id: 2, title: "Academic Structure Setup", status: "complete", category: "Academic" },
-    { id: 3, title: "Staff Information Added", status: "partial", category: "Staff" },
-    { id: 4, title: "Fee Structure Configured", status: "incomplete", category: "Finance" },
-    { id: 5, title: "Transport Routes Defined", status: "incomplete", category: "Transport" },
-    { id: 6, title: "Hostel Facilities Set", status: "complete", category: "Hostel" },
-    { id: 7, title: "Library Inventory Added", status: "partial", category: "Library" },
-    { id: 8, title: "Notifications Configured", status: "complete", category: "Communication" },
-    { id: 9, title: "Academic Calendar Set", status: "complete", category: "Calendar" },
-    { id: 10, title: "Timetable Generated", status: "incomplete", category: "Schedule" },
-  ]);
-
+  const { status, loading, error } = useReadinessStatus();
   const [filters, setFilters] = React.useState({
     category: "all",
     status: "all"
   });
+
+  const readinessScore = status?.score ?? 0;
+  const checks = status?.checks || [];
+
+  const filteredChecks = checks.filter(check => {
+    const categoryMatch = filters.category === "all" || check.category === filters.category;
+    const statusMatch = filters.status === "all" || check.status === filters.status;
+    return categoryMatch && statusMatch;
+  });
+
+  if (loading) return <div className="text-center py-12">Loading readiness status...</div>;
+  if (error) return <div className="text-center text-destructive p-6">Error loading readiness status: {error.message}</div>;
 
   const filteredChecks = checks.filter(check => {
     const categoryMatch = filters.category === "all" || check.category === filters.category;
@@ -29,23 +29,8 @@ export default function ValidationReadiness() {
   });
 
   const handleCheckClick = (check) => {
-    // Toggle status for demo purposes
-    const newChecks = checks.map(c =>
-      c.id === check.id
-        ? { ...c, status:
-            c.status === "complete" ? "incomplete" :
-            c.status === "incomplete" ? "partial" :
-            "complete"
-          }
-        : c
-    );
-    setChecks(newChecks);
-
-    // Recalculate readiness score
-    const completed = newChecks.filter(c => c.status === "complete").length;
-    const partial = newChecks.filter(c => c.status === "partial").length;
-    const score = Math.round(((completed * 1 + partial * 0.5) / newChecks.length) * 100);
-    setReadinessScore(score);
+    // Action not supported in read-only validation view
+    return;
   };
 
   return (

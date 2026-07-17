@@ -2,33 +2,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Users, Calendar, Banknote, Building, Bus, Bed, BookOpen, Bell, GraduationCap, List } from "lucide-react";
+import { useAcademicData } from "@/features/school-admin/hooks/useSchoolAdminData";
+import { schoolAdminService } from "@/features/school-admin/services/schoolAdminService";
+import { useSchoolAdmin } from "@/features/school-admin/contexts/SchoolAdminContext";
 
 export default function AcademicOverview() {
-  // Sample data - would come from Supabase in real implementation
-  const classes = [
-    { name: "Nursery", students: 25, sections: 2, teacher: "Ms. Sharma" },
-    { name: "LKG", students: 28, sections: 2, teacher: "Ms. Patel" },
-    { name: "UKG", students: 30, sections: 2, teacher: "Ms. Gupta" },
-    { name: "1st", students: 32, sections: 3, teacher: "Mr. Singh" },
-    { name: "2nd", students: 30, sections: 3, teacher: "Ms. Reddy" },
-    { name: "3rd", students: 28, sections: 2, teacher: "Mr. Kumar" },
-    { name: "4th", students: 25, sections: 2, teacher: "Ms. Nair" },
-    { name: "5th", students: 22, sections: 2, teacher: "Mr. Joshi" },
-  ];
+  const { data, loading, error, refetch } = useAcademicData();
+  const { schoolId } = useSchoolAdmin();
+  const classes = data?.classes || [];
+  const subjects = data?.subjects || [];
+  const exams = data?.exams || [];
 
-  const subjects = [
-    { name: "Mathematics", classes: "1-5", teacher: "Mr. Sharma", classesCount: 5 },
-    { name: "English", classes: "1-5", teacher: "Ms. Patel", classesCount: 5 },
-    { name: " Science", classes: "3-5", teacher: "Ms. Gupta", classesCount: 3 },
-    { name: "Hindi", classes: "1-5", teacher: "Mr. Kumar", classesCount: 5 },
-    { name: "Computer", classes: "3-5", teacher: "Ms. Nair", classesCount: 3 },
-  ];
+  if (loading) return <div className="text-center py-12">Loading academic data...</div>;
+  if (error) return <div className="text-center text-destructive p-6">Error loading academic data: {error.message}</div>;
 
-  const upcomingExams = [
-    { name: "Unit Test 1", date: "Jan 15, 2025", classes: "1-5", subject: "Mathematics" },
-    { name: "Unit Test 1", date: "Jan 16, 2025", classes: "1-5", subject: "English" },
-    { name: "Unit Test 1", date: "Jan 17, 2025", classes: "3-5", subject: "Science" },
-  ];
+  // Process classes data for the overview (extract what we need from the Supabase response)
+  const processedClasses = classes.map(cls => ({
+    name: cls.name,
+    students: cls.students?._count || 0,
+    sections: cls.sections?.length || 0,
+    teacher: cls.sections && cls.sections.length > 0 ? "Assigned" : "Not assigned" // Simplified for now
+  }));
+
+  // Process subjects data
+  const processedSubjects = subjects.map(subj => ({
+    name: subj.name,
+    classes: "1-5", // This would need to be calculated from actual class assignments in a real app
+    teacher: "Assigned", // Simplified
+    classesCount: 5 // Placeholder
+  }));
+
+  // Process upcoming exams
+  const processedExams = exams.map(exam => ({
+    name: exam.name,
+    date: new Date(exam.start_date || exam.end_date || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    classes: "1-5", // Would need to be determined from exam_schedule
+    subject: exam.exam_schedule?.[0]?.subject?.name || "General" // Simplified
+  }));
 
   return (
     <div className="space-y-6">
@@ -41,7 +51,9 @@ export default function AcademicOverview() {
                 <CardTitle variant="h3" className="text-sm font-semibold text-primary">
                   Total Students
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">1,245</p>
+                <p className="text-xs text-muted-foreground">
+                  {processedClasses.reduce((sum, cls) => sum + cls.students, 0)}
+                </p>
               </div>
             </div>
           </CardHeader>
@@ -60,7 +72,7 @@ export default function AcademicOverview() {
                 <CardTitle variant="h3" className="text-sm font-semibold text-primary">
                   Total Classes
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">8</p>
+                <p className="text-xs text-muted-foreground">{processedClasses.length}</p>
               </div>
             </div>
           </CardHeader>
@@ -79,7 +91,7 @@ export default function AcademicOverview() {
                 <CardTitle variant="h3" className="text-sm font-semibold text-primary">
                   Total Subjects
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">15</p>
+                <p className="text-xs text-muted-foreground">{processedSubjects.length}</p>
               </div>
             </div>
           </CardHeader>
@@ -98,7 +110,7 @@ export default function AcademicOverview() {
                 <CardTitle variant="h3" className="text-sm font-semibold text-primary">
                   Upcoming Exams
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">3</p>
+                <p className="text-xs text-muted-foreground">{processedExams.length}</p>
               </div>
             </div>
           </CardHeader>
@@ -117,7 +129,7 @@ export default function AcademicOverview() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              {classes.map((cls, index) => (
+              {processedClasses.map((cls, index) => (
                 <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-secondary/5">
                   <div className="flex items-center space-x-3">
                     <div className="h-8 w-8 bg-primary/10 rounded-flex items-center justify-center">
@@ -151,7 +163,7 @@ export default function AcademicOverview() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {subjects.map((subject, index) => (
+                {processedSubjects.map((subject, index) => (
                   <TableRow key={index}>
                     <TableCell>{subject.name}</TableCell>
                     <TableCell>{subject.classes}</TableCell>
@@ -178,7 +190,7 @@ export default function AcademicOverview() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {upcomingExams.map((exam, index) => (
+              {processedExams.map((exam, index) => (
                 <TableRow key={index}>
                   <TableCell>{exam.name}</TableCell>
                   <TableCell>{exam.date}</TableCell>

@@ -1,8 +1,11 @@
+"use client"
+
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { schoolAdminService } from "@/features/school-admin/services/schoolAdminService";
+import { createClient } from "@/lib/supabase/client";
 
 // Create context
-const SchoolAdminContext = createContext();
+export const SchoolAdminContext = createContext();
 
 // Provider component
 export const SchoolAdminProvider = ({ children }) => {
@@ -14,13 +17,49 @@ export const SchoolAdminProvider = ({ children }) => {
   const [readinessStatus, setReadinessStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [schoolId, setSchoolId] = useState(null);
+
+  // Create Supabase client
+  const supabase = createClient();
+
+  // Set up auth listener to update schoolId
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setSchoolId(user.school_id || user.schoolId);
+      } else {
+        setSchoolId(null);
+      }
+    };
+
+    getSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setSchoolId(session.user.school_id || session.user.schoolId);
+        } else {
+          setSchoolId(null);
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   // Fetch functions
   const fetchDashboardData = useCallback(async () => {
+    if (!schoolId) {
+      setError(new Error("School ID not available"));
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const data = await schoolAdminService.getDashboardStats();
+      const data = await schoolAdminService.getDashboardStats(schoolId);
       setDashboardData(data);
     } catch (err) {
       setError(err);
@@ -28,13 +67,17 @@ export const SchoolAdminProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [schoolId]);
 
   const fetchAcademicData = useCallback(async () => {
+    if (!schoolId) {
+      setError(new Error("School ID not available"));
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const data = await schoolAdminService.getAcademicData();
+      const data = await schoolAdminService.getAcademicData(schoolId);
       setAcademicData(data);
     } catch (err) {
       setError(err);
@@ -42,13 +85,17 @@ export const SchoolAdminProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [schoolId]);
 
   const fetchConfigurationData = useCallback(async () => {
+    if (!schoolId) {
+      setError(new Error("School ID not available"));
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const data = await schoolAdminService.getConfiguration();
+      const data = await schoolAdminService.getConfiguration(schoolId);
       setConfigurationData(data);
     } catch (err) {
       setError(err);
@@ -56,13 +103,17 @@ export const SchoolAdminProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [schoolId]);
 
   const fetchSetupSteps = useCallback(async () => {
+    if (!schoolId) {
+      setError(new Error("School ID not available"));
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const data = await schoolAdminService.getSetupSteps();
+      const data = await schoolAdminService.getSetupSteps(schoolId);
       setSetupSteps(data);
     } catch (err) {
       setError(err);
@@ -70,13 +121,17 @@ export const SchoolAdminProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [schoolId]);
 
   const fetchReadinessStatus = useCallback(async () => {
+    if (!schoolId) {
+      setError(new Error("School ID not available"));
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const data = await schoolAdminService.getReadinessStatus();
+      const data = await schoolAdminService.getReadinessStatus(schoolId);
       setReadinessStatus(data);
     } catch (err) {
       setError(err);
@@ -84,41 +139,83 @@ export const SchoolAdminProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [schoolId]);
 
-  // Load all data
+  // Load all data - wrapped in microtask to avoid synchronous setState in useEffect
   const loadAllData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      await Promise.all([
-        fetchDashboardData(),
-        fetchAcademicData(),
-        fetchConfigurationData(),
-        fetchSetupSteps(),
-        fetchReadinessStatus()
-      ]);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    fetchDashboardData,
-    fetchAcademicData,
-    fetchConfigurationData,
-    fetchSetupSteps,
-    fetchReadinessStatus
-  ]);
+    return Promise.resolve().then(async () => {
+      if (!schoolId) {
+        setError(new Error("School ID not available"));
+        return;
+      }
+      try {
+        setLoading(true);
+        setError(null);
+        await Promise.all([
+          fetchDashboardData(),
+          fetchAcademicData(),
+          fetchConfigurationData(),
+          fetchSetupSteps(),
+          fetchReadinessStatus()
+        ]);
+      } catch (err) {
+        setError(err);
+      } finally {
+        setLoading(false);
+      }
+    });
+  }, [schoolId, fetchDashboardData, fetchAcademicData, fetchConfigurationData, fetchSetupSteps, fetchReadinessStatus]);
 
-  // Initial load
+  // Initial load - run when schoolId changes
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    if (schoolId) {
+      loadAllData();
+    }
+  }, [schoolId, loadAllData]);
+
+  // Realtime updates for school admin data
+  useEffect(() => {
+    if (!schoolId) return;
+
+    const channel = supabase.channel(`school-admin-${schoolId}`);
+    const tables = [
+      "classes",
+      "sections",
+      "subjects",
+      "exams",
+      "exam_schedule",
+      "timetable_slots",
+      "transport_routes",
+      "library_books",
+      "hostel_rooms",
+      "fee_structures",
+      "notifications",
+      "fee_payments",
+      "attendance",
+      "staff_attendance"
+    ];
+
+    tables.forEach((table) => {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table, filter: `school_id=eq.${schoolId}` },
+        () => {
+          loadAllData();
+        }
+      );
+    });
+
+    channel.subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [schoolId, loadAllData, supabase]);
 
   // Context value
   const value = {
     // Data
+    schoolId,
     dashboardData,
     academicData,
     configurationData,
@@ -132,10 +229,10 @@ export const SchoolAdminProvider = ({ children }) => {
     // Actions
     refreshData: loadAllData,
     refreshDashboard: fetchDashboardData,
-    refreshAcademic: fetchAcademicData,
-    refreshConfiguration: fetchConfigurationData,
-    refreshSetupSteps: fetchSetupSteps,
-    refreshReadiness: fetchReadinessStatus
+    fetchAcademic: fetchAcademicData,
+    fetchConfiguration: fetchConfigurationData,
+    fetchSetupSteps: fetchSetupSteps,
+    fetchReadiness: fetchReadinessStatus
   };
 
   return (

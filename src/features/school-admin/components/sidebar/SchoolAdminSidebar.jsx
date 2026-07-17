@@ -88,7 +88,7 @@ export default function SchoolAdminSidebar() {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-border flex-shrink-0 z-20">
+    <aside className="w-64 bg-sidebar border-r border-border flex-shrink-0">
       <div className="flex h-full flex-col p-4">
         <div className="flex items-center space-x-3 mb-6">
           <div className="h-8 w-8 bg-primary/20 rounded-lg flex items-center justify-center">
